@@ -4,7 +4,7 @@ CLOS revision protocol for [cl-stack](https://github.com/egao1980/cl-stack) (`st
 
 Capability brief: [`cl-stack/docs/capabilities/revision.md`](https://github.com/egao1980/cl-stack/blob/main/docs/capabilities/revision.md).
 
-Version **0.1.0** — milestone R0a, the graph layer, with a thread-safe `in-memory-store` (one lock; conditions are signalled only after it is released, so handlers may call back into the store). Content, targets, plans, projections and the diff integration are R0b.
+Version **0.2.0** — milestones R0a (graph layer, thread-safe `in-memory-store`; one lock, conditions are signalled only after it is released) and R0b: content (states / deltas over diff-protocol), targets and plans with resumable `execute-plan`, projections (`:exact` / `:shadow` / `:model`), merges, and composite revisions, with an `in-memory-target`.
 
 **R0b (contract on this branch, in progress):** the content layer on [`diff-protocol`](https://github.com/egao1980/diff-protocol) (`revision-state`, `revision-delta`, `delta-inverse`, `delta-footprint`, `state-diff`, `content-primary` `:state`|`:delta`, `walk-revisions :footprint`), targets and plans (`target-revisions`, `target-stamp`, `target-drift`, `capture-revision`, `plan-transition`, `describe-plan`, `execute-plan`, `with-target-transaction`), projections (`project-state`, `project-plan`, `project-merge`, `commit-projection`, `discard-projection`), composite revisions (`commit-composite`, `plan-composite`, `restore-composite`), an `in-memory-target` over sexp states, the rest of the condition tree and the permission-gated `force` restart. The methods are stubs; `tests/` (content, target, plan, projection, composite, force and law-r0b) is the spec.
 

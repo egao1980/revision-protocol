@@ -17,12 +17,6 @@
 ;;; first parent's state and the revision's state.
 ;;; ------------------------------------------------------------------
 
-(defun %r0b-stub (operation &optional detail)
-  "Contract stub: signal a plain SIMPLE-ERROR (never a REVISION-ERROR), so the
-R0b suite loads and fails without false passes. Removed by the implementation."
-  (error "revision-protocol: ~s~@[ ~s~] is not implemented (R0b stub)"
-         operation detail))
-
 (defclass revision-payload ()
   ((state :initarg :state :initform nil :reader payload-state)
    (state-p :initarg :state-p :initform nil :reader payload-state-p)

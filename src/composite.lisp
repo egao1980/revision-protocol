@@ -37,8 +37,19 @@ REVISION-NOT-FOUND). With STORE NIL, DESIGNATOR must be an id string, kept as
 is. DEPENDS-ON: list of role keywords. RECIPE: NIL or a function (PART TARGET).
 TYPE-ERROR for a non-keyword ROLE, a non-string DESIGNATOR without a store, or a
 non-function RECIPE."
-  (declare (ignore role store designator depends-on recipe))
-  (%r0b-stub 'make-manifest-part))
+  (check-type role keyword)
+  (check-type store (or null revision-store))
+  (check-type depends-on list)
+  (dolist (d depends-on)
+    (check-type d keyword))
+  (check-type recipe (or null function))
+  (let ((id (if store
+                (revision-id (resolve-revision store designator))
+                (progn (check-type designator string)
+                       (copy-seq designator)))))
+    (make-instance 'manifest-part
+                   :role role :store store :revision-id id
+                   :depends-on (copy-list depends-on) :recipe recipe)))
 
 (defclass revision-manifest ()
   ((parts :initarg :parts :initform nil :reader %manifest-parts))
@@ -53,8 +64,44 @@ role, in the order given."))
   "→ REVISION-MANIFEST of PARTS (MANIFEST-PARTs). REVISION-ERROR
 when two parts share a role, a DEPENDS-ON names a role not in PARTS, or the
 dependencies form a cycle."
-  (declare (ignore parts))
-  (%r0b-stub 'make-manifest))
+  (check-type parts list)
+  (dolist (p parts)
+    (check-type p manifest-part))
+  (let ((roles (mapcar #'part-role parts)))
+    (loop for (role . more) on roles
+          when (member role more)
+            do (error 'revision-error
+                      :message (format nil "two manifest parts have role ~s" role)))
+    (dolist (p parts)
+      (dolist (d (%part-depends-on p))
+        (unless (member d roles)
+          (error 'revision-error
+                 :message (format nil "part ~s depends on ~s, which is not in the manifest"
+                                  (part-role p) d))))))
+  ;; Signals REVISION-ERROR on a dependency cycle.
+  (%dependency-order parts)
+  (make-instance 'revision-manifest :parts (copy-list parts)))
+
+(defun %dependency-order (parts)
+  "PARTS with every part after the parts it depends on; otherwise in the given
+order (each round emits the first ready part). REVISION-ERROR on a cycle.
+Assumes roles are unique and every dependency names a part in PARTS."
+  (let ((pending (copy-list parts))
+        (done '())
+        (out '()))
+    (loop while pending
+          do (let ((ready (find-if (lambda (p)
+                                     (every (lambda (d) (member d done))
+                                            (%part-depends-on p)))
+                                   pending)))
+               (unless ready
+                 (error 'revision-error
+                        :message (format nil "manifest dependencies form a cycle among ~s"
+                                         (mapcar #'part-role pending))))
+               (push (part-role ready) done)
+               (push ready out)
+               (setf pending (remove ready pending :test #'eq))))
+    (nreverse out)))
 
 (defgeneric commit-composite (store parts &key parents ref expected message)
   (:documentation "Commit a composite revision whose content is

@@ -308,6 +308,13 @@ smallest id."
   (let ((entry (and name (gethash name (%refs store)))))
     (and entry (%by-id store (ref-target entry)))))
 
+(defun %footprints-overlap-p (footprints wanted)
+  "True when some resource string in FOOTPRINTS overlaps one in WANTED
+(DIFF-PROTOCOL:FOOTPRINT-OVERLAP-P). Pure; no store access."
+  (some (lambda (f)
+          (some (lambda (w) (diff:footprint-overlap-p f w)) wanted))
+        footprints))
+
 (defun %fresh-id (store)
   "40 lowercase hex characters, unused in STORE. Lock held."
   (loop for id = (format nil "~(~40,'0x~)"
@@ -345,11 +352,17 @@ smallest id."
 (defmethod walk-revisions ((store in-memory-store) from
                            &key (order :topo) until reverse footprint)
   (check-type order (member :topo :time :first-parent))
-  (when footprint
-    (%r0b-stub 'walk-revisions :footprint))
+  (check-type footprint list)
   (%check-designators from)
   (%check-designators until)
   (let ((walk (%with-store (store) (%walk-locked store from order until))))
+    (when footprint
+      ;; Outside the lock: REVISION-DELTA is a public GF.
+      (setf walk (remove-if-not
+                  (lambda (r)
+                    (%footprints-overlap-p
+                     (delta-footprint (revision-delta store r)) footprint))
+                  walk)))
     (if reverse (reverse walk) walk)))
 
 (defmethod revision-range ((store in-memory-store) include exclude)
@@ -431,9 +444,11 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
   (mapc #'%check-designator parents)
   (when expected
     (%check-designator expected))
-  (let ((ref (and ref (copy-seq ref)))
-        (id (and id (copy-seq id)))
-        (provenance (copy-list provenance)))
+  (let* ((ref (and ref (copy-seq ref)))
+         (id (and id (copy-seq id)))
+         (provenance (copy-list provenance))
+         ;; The FORCE gate, read once and outside the lock.
+         (forcible (and ref (permit-force-p store ref) t)))
     (loop
       (let ((recorded-at (dt:now)))     ; the caller's thread and clock
         (multiple-value-bind (ok result)
@@ -461,7 +476,14 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
                  ;; Defaulted parents stay defaulted: the next attempt re-reads
                  ;; them from the new tip.
                  (setf expected (ref-conflict-actual result)
-                       expected-p t))))
+                       expected-p t))
+               (force ()
+                 :test (lambda (c) (declare (ignore c)) forcible)
+                 :report (lambda (s)
+                           (format s "Commit onto ~s unconditionally (EXPECTED omitted)."
+                                   ref))
+                 (setf expected nil
+                       expected-p nil))))
             (t (error result))))))))
 
 ;;; ------------------------------------------------------------------
@@ -492,7 +514,8 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
   (%check-designator designator)
   (when expected
     (%check-designator expected))
-  (let ((name (copy-seq name)))
+  (let* ((name (copy-seq name))
+         (forcible (and (permit-force-p store name) t)))
     (loop
       (multiple-value-bind (ok result)
           (%attempt store (lambda ()
@@ -514,7 +537,14 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
                          (format s "Move ~s with its current target as expected."
                                  name))
                (setf expected (ref-conflict-actual result)
-                     expected-p t))))
+                     expected-p t))
+             (force ()
+               :test (lambda (c) (declare (ignore c)) forcible)
+               :report (lambda (s)
+                         (format s "Move ~s unconditionally (EXPECTED omitted)."
+                                 name))
+               (setf expected nil
+                     expected-p nil))))
           ((typep result 'tag-immutable)
            (restart-case (error result)
              (create-new-tag (new-name)
@@ -582,25 +612,32 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
   (check-type name string)
   (when expected
     (%check-designator expected))
-  (loop
-    (multiple-value-bind (ok result)
-        (%attempt store (lambda () (%delete-locked store name expected expected-p)))
-      (cond
-        (ok
-         (destructuring-bind (done event) result
-           (%notify store event)
-           (return done)))
-        ((typep result 'ref-conflict)
-         (restart-case (error result)
-           (use-current ()
-             :report (lambda (s) (format s "Keep ~s; return NIL." name))
-             (return nil))
-           (retry ()
-             :report (lambda (s)
-                       (format s "Delete ~s whatever it points at now." name))
-             (setf expected (ref-conflict-actual result)
-                   expected-p t))))
-        (t (error result))))))
+  (let ((forcible (and (permit-force-p store name) t)))
+    (loop
+      (multiple-value-bind (ok result)
+          (%attempt store (lambda () (%delete-locked store name expected expected-p)))
+        (cond
+          (ok
+           (destructuring-bind (done event) result
+             (%notify store event)
+             (return done)))
+          ((typep result 'ref-conflict)
+           (restart-case (error result)
+             (use-current ()
+               :report (lambda (s) (format s "Keep ~s; return NIL." name))
+               (return nil))
+             (retry ()
+               :report (lambda (s)
+                         (format s "Delete ~s whatever it points at now." name))
+               (setf expected (ref-conflict-actual result)
+                     expected-p t))
+             (force ()
+               :test (lambda (c) (declare (ignore c)) forcible)
+               :report (lambda (s)
+                         (format s "Delete ~s unconditionally (EXPECTED omitted)." name))
+               (setf expected nil
+                     expected-p nil))))
+          (t (error result)))))))
 
 (defmethod find-ref ((store in-memory-store) name)
   (check-type name string)
