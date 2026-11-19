@@ -182,14 +182,17 @@
            (tg (%target-at s "o1000000"))
            (p (rev:plan-transition s tg "o0000000"))
            (seen nil))
-      (handler-bind ((rev:irreversible-step
-                       (lambda (c)
-                         (setf seen (list (rev:irreversible-step-step c)
-                                          (and (find-restart 'rev:skip-step c) t)
-                                          (and (find-restart 'rev:stamp-only c) t)
-                                          (and (find-restart 'rev:abort-transition c) t)))
-                         (invoke-restart 'rev:abort-transition))))
-        (ok (null (rev:execute-plan tg p)) "abort-transition returns NIL"))
+      ;; The handler sits inside OK: Rove's OK binds its own ERROR handler
+      ;; around the form, which would run first if this one were outside.
+      (ok (null (handler-bind ((rev:irreversible-step
+                                 (lambda (c)
+                                   (setf seen (list (rev:irreversible-step-step c)
+                                                    (and (find-restart 'rev:skip-step c) t)
+                                                    (and (find-restart 'rev:stamp-only c) t)
+                                                    (and (find-restart 'rev:abort-transition c) t)))
+                                   (invoke-restart 'rev:abort-transition))))
+                  (rev:execute-plan tg p)))
+          "abort-transition returns NIL")
       (ok (eq (first (rev:plan-steps p)) (first seen)))
       (ok (equal '(t t t) (rest seen)))
       (ok (equal '("o1000000") (rev:target-revisions tg)))

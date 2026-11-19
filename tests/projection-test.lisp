@@ -158,13 +158,19 @@ RESTART. → (values projection condition offered-restarts target)."
 
 (defun %commit-resolving (restart)
   (multiple-value-bind (s p) (%conflicting-merge)
-    (let ((seen nil))
+    (let ((seen nil) (offered nil))
       (values (handler-bind ((rev:merge-conflict
                                (lambda (c)
-                                 (setf seen c)
+                                 (setf seen c
+                                       ;; Restarts exist only while the call runs,
+                                       ;; so record them here, not after return.
+                                       offered (remove-if-not
+                                                (lambda (r) (find-restart r c))
+                                                '(rev:take-ours rev:take-theirs
+                                                  rev:use-merged abort)))
                                  (invoke-restart restart))))
                 (rev:commit-projection s p))
-              s p seen))))
+              s p seen offered))))
 
 (deftest project-merge-conflicts
   (multiple-value-bind (s p) (%conflicting-merge)
@@ -174,14 +180,13 @@ RESTART. → (values projection condition offered-restarts target)."
     (ok (%st= '(:a 1 :b 1 :c 1) (rev:projection-state p)) "base value kept")
     (ok (signals (rev:commit-projection s p) 'rev:merge-conflict)))
   (testing "the condition"
-    (multiple-value-bind (r s p c) (%commit-resolving 'abort)
+    (multiple-value-bind (r s p c offered) (%commit-resolving 'abort)
       (declare (ignore s))
       (ok (null r) "abort commits nothing")
       (ok (typep c 'rev:revision-error))
       (ok (eq p (rev:merge-conflict-projection c)))
       (ok (= 1 (length (rev:merge-conflict-conflicts c))))
-      (ok (every (lambda (r) (find-restart r c))
-                 '(rev:take-ours rev:take-theirs rev:use-merged abort)))))
+      (ok (equal '(rev:take-ours rev:take-theirs rev:use-merged abort) offered))))
   (testing "abort leaves the store alone"
     (multiple-value-bind (r s) (%commit-resolving 'abort)
       (declare (ignore r))
