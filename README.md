@@ -4,7 +4,7 @@ CLOS revision protocol for [cl-stack](https://github.com/egao1980/cl-stack) (`st
 
 Capability brief: [`cl-stack/docs/capabilities/revision.md`](https://github.com/egao1980/cl-stack/blob/main/docs/capabilities/revision.md).
 
-**Status: contract only (milestone R0a, the graph layer).** The package, conditions, generic functions, designator values and the `in-memory-store` class are declared. The store methods are stubs that signal a plain `simple-error`; the Rove suite in `tests/` is the specification and fails until they are implemented.
+Version **0.1.0** — milestone R0a, the graph layer, with a thread-safe `in-memory-store` (one lock; conditions are signalled only after it is released, so handlers may call back into the store). Content, targets, plans, projections and the diff integration are R0b.
 
 ## R0a surface
 
