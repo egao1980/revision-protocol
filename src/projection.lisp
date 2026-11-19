@@ -73,9 +73,12 @@ parents by default."))
 (defgeneric projection-discarded-p (projection)
   (:documentation "True after DISCARD-PROJECTION."))
 
-(defgeneric commit-projection (store projection &key parents message ref)
+(defgeneric commit-projection (store projection &key parents message ref
+                                                provenance valid-at id)
   (:documentation "Commit PROJECTION-STATE as a new revision → REVISION.
-PARENTS defaults to PROJECTION-PARENTS; MESSAGE and REF as in COMMIT-REVISION.
+PARENTS defaults to PROJECTION-PARENTS; MESSAGE, REF, PROVENANCE, VALID-AT and ID
+as in COMMIT-REVISION (a backend that cannot honor a caller ID refuses it with
+REVISION-ERROR).
 A projection with conflicts signals MERGE-CONFLICT with restarts TAKE-OURS
 (each conflict resolved to ours), TAKE-THEIRS, USE-MERGED (commit as projected,
 base values at the conflicts) and ABORT (return NIL, commit nothing).

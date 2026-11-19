@@ -189,7 +189,9 @@ existing ref, the parent is REF's current target; otherwise a root.
 REF: name of a movable ref moved to the new revision (created if absent).
 EXPECTED: CAS value for REF (an id/designator, or NIL = ref must be absent);
 when omitted it is the target REF had when the commit started.
-VALID-AT: optional instant. ID: caller-chosen id, for backends that allow it.
+VALID-AT: optional instant. PROVENANCE: plist. ID: caller-chosen id (a string).
+A backend that chooses ids itself (git, jj) refuses a non-NIL ID with
+REVISION-ERROR before anything is written; the in-memory store accepts it.
 Atomic: on any condition nothing is committed and no ref moves.
 Signals REVISION-NOT-FOUND (a parent), REF-CONFLICT (restarts USE-CURRENT →
 returns REF's current target revision, nothing committed; RETRY → commit again

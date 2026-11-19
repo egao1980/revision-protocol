@@ -22,6 +22,10 @@
    #:cycle-refused
    #:cycle-refused-id
    #:cycle-refused-parents
+   #:vc-tool-version-error
+   #:vc-tool-version-error-tool
+   #:vc-tool-version-error-found
+   #:vc-tool-version-error-required
    ;; restart names
    #:use-current
    #:retry
@@ -139,6 +143,8 @@
    #:permit-force-p
    #:target-fidelities
    #:target-transactional-p
+   #:ref-cas-p
+   #:conflicted-revisions-p
 
    ;; content layer
    #:revision-payload

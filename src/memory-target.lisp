@@ -112,12 +112,16 @@ REVISION-ERROR when TARGET is stamped with several revisions."
       (diff:compute-diff engine stamped actual :level :changes))))
 
 (defmethod capture-revision ((target in-memory-target) store
-                             &key (parents nil parents-p) message)
+                             &key (parents nil parents-p) message provenance
+                               valid-at id)
   (let ((revision (commit-revision store (copy-tree (%state target))
                                    :parents (if parents-p
                                                 parents
                                                 (target-revisions target))
-                                   :message message)))
+                                   :message message
+                                   :provenance provenance
+                                   :valid-at valid-at
+                                   :id id)))
     (setf (%revisions-stamp target) (list (revision-id revision)))
     revision))
 
@@ -182,9 +186,9 @@ target state is then unchanged). The FAIL-STEP hook runs first."
     (let ((drift (target-drift target store)))
       (when drift
         (restart-case (error 'target-drift-detected :target target :drift drift)
-          (capture-and-continue ()
+          (capture-and-continue (&key id (message "captured drift"))
             :report "Capture the drifted state as a revision, re-plan from it and run that."
-            (capture-revision target store)
+            (capture-revision target store :id id :message message)
             (return-from execute-plan
               (execute-plan target (plan-transition store target
                                                     (first (plan-goal plan))))))

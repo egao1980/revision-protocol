@@ -67,6 +67,26 @@ returns what the operation returns. Not offered, (FIND-RESTART (QUOTE FORCE)) is
   (declare (ignore name))
   nil)
 
+(defgeneric ref-cas-p (store)
+  (:documentation "True when STORE updates refs by a native compare-and-swap
+(capability :ref-cas): the EXPECTED check of MOVE-REF, DELETE-REF and
+COMMIT-REVISION :REF and the write are one atomic step for every writer of the
+store, in or out of this image. NIL when the backend emulates it (e.g. jj checks
+an operation id and detects divergence afterwards); EXPECTED and REF-CONFLICT keep
+their meaning either way. Default method (and the in-memory store): T."))
+
+(defmethod ref-cas-p ((store revision-store))
+  t)
+
+(defgeneric conflicted-revisions-p (store)
+  (:documentation "True when a revision of STORE can hold unresolved conflicts as
+content (capability :conflicted-revisions; jj's conflicted commits), so a
+committed state is not necessarily a resolved one. The backend documents how a
+conflict reads. Default method (and the in-memory store): NIL."))
+
+(defmethod conflicted-revisions-p ((store revision-store))
+  nil)
+
 ;;; ------------------------------------------------------------------
 ;;; Content protocol
 ;;; ------------------------------------------------------------------

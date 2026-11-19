@@ -300,7 +300,8 @@ applied. One change may sit in several conflicts: it is applied once."
                                            :engine engine))))
 
 (defmethod commit-projection ((store in-memory-store) (projection memory-projection)
-                              &key (parents nil parents-p) message ref)
+                              &key (parents nil parents-p) message ref provenance
+                                valid-at id)
   (%live-projection projection)
   (let ((state (copy-tree (%projected-state projection)))
         (conflicts (%projected-conflicts projection))
@@ -323,7 +324,10 @@ applied. One change may sit in several conflicts: it is applied once."
     (commit-revision store state
                      :parents (if parents-p parents (projection-parents projection))
                      :message message
-                     :ref ref)))
+                     :ref ref
+                     :provenance provenance
+                     :valid-at valid-at
+                     :id id)))
 
 ;;; ------------------------------------------------------------------
 ;;; Composite revisions
@@ -331,11 +335,13 @@ applied. One change may sit in several conflicts: it is applied once."
 
 (defmethod commit-composite ((store in-memory-store) parts
                              &key (parents nil parents-p) ref
-                               (expected nil expected-p) message)
+                               (expected nil expected-p) message provenance
+                               valid-at id)
   ;; Absent :PARENTS / :EXPECTED keep their COMMIT-REVISION meaning.
   (let ((manifest (make-manifest parts)))
     (apply #'commit-revision store manifest
            :ref ref :message message
+           :provenance provenance :valid-at valid-at :id id
            (append (and parents-p (list :parents parents))
                    (and expected-p (list :expected expected))))))
 
