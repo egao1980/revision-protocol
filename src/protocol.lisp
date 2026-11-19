@@ -229,7 +229,7 @@ REF-CONFLICT (USE-CURRENT → NIL, ref kept; RETRY → delete)."))
 (defgeneric revision-children (store designator)
   (:documentation "→ REVISIONs that have DESIGNATOR as a parent (any order)."))
 
-(defgeneric walk-revisions (store from &key order until reverse)
+(defgeneric walk-revisions (store from &key order until reverse footprint)
   (:documentation "→ list of REVISIONs reachable from FROM (a designator or a
 list of them), excluding UNTIL (designator or list) and its ancestors.
 Without REVERSE every order lists parents before children:
@@ -238,6 +238,9 @@ Without REVERSE every order lists parents before children:
                  parents still come first;
   :FIRST-PARENT  only the first-parent chain of FROM, root first.
 REVERSE T returns the same list reversed (children first, as git log).
+FOOTPRINT (R0b), a list of resource strings: keep only revisions whose
+REVISION-DELTA footprint overlaps one of them (DIFF-PROTOCOL:FOOTPRINT-OVERLAP-P);
+the walk order of the kept revisions is unchanged. NIL keeps all.
 Each revision appears once."))
 
 (defgeneric merge-base (store a b &key all)
