@@ -1,5 +1,5 @@
 (defsystem "revision-protocol"
-  :version "0.0.1"
+  :version "0.1.0"
   :description "CLOS revision protocol for cl-stack: immutable revision DAG, movable refs and immutable tags with CAS updates, revision designators (as-of on recorded/valid time), graph walks"
   :author "egao1980"
   :license "MIT"
