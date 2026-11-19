@@ -38,10 +38,13 @@ STATE-EQUAL) the state of the stamped revision (NIL state when unstamped);
 otherwise the DIFF from that state to TARGET-STATE. More than one stamped
 revision → REVISION-ERROR (R0b)."))
 
-(defgeneric capture-revision (target store &key parents message)
+(defgeneric capture-revision (target store &key parents message provenance
+                                                valid-at id)
   (:documentation "Commit TARGET-STATE to STORE as a new revision → REVISION.
-PARENTS (designators) defaults to TARGET-REVISIONS. Then stamps TARGET with the
-new revision, so TARGET-DRIFT is NIL afterwards."))
+PARENTS (designators) defaults to TARGET-REVISIONS; MESSAGE, PROVENANCE, VALID-AT
+and ID as in COMMIT-REVISION (a backend that cannot honor a caller ID refuses it
+with REVISION-ERROR). Then stamps TARGET with the new revision, so TARGET-DRIFT is
+NIL afterwards. On any condition nothing is committed and the stamp is kept."))
 
 (defgeneric target-fidelities (target)
   (:documentation "→ the projection fidelities TARGET supports, a subset of
@@ -142,8 +145,9 @@ STEP-REVERSIBLE-P is NIL. A plan with no steps writes nothing (\"\")."))
 skipped-steps). After each applied step TARGET is stamped with (STEP-TO) — or
 NIL for the empty state — before the next step starts.
 Before the first step, TARGET-DRIFT (against PLAN-STORE) non-NIL signals
-TARGET-DRIFT-DETECTED with restarts CAPTURE-AND-CONTINUE (capture the drifted
-state as a child of the stamp, re-plan from it to the goal, run that),
+TARGET-DRIFT-DETECTED with restarts CAPTURE-AND-CONTINUE (&key ID MESSAGE:
+CAPTURE-REVISION of the drifted state as a child of the stamp, with ID and
+MESSAGE, default \"captured drift\"; re-plan from it to the goal, run that),
 DISCARD-DRIFT (reset the state to the stamped revision's, then run) and ABORT
 (return NIL, nothing changed).
 Resumable: when TARGET is stamped with the TO of some step (an earlier run

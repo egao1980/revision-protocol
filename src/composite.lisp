@@ -103,10 +103,12 @@ Assumes roles are unique and every dependency names a part in PARTS."
                (setf pending (remove ready pending :test #'eq))))
     (nreverse out)))
 
-(defgeneric commit-composite (store parts &key parents ref expected message)
+(defgeneric commit-composite (store parts &key parents ref expected message
+                                              provenance valid-at id)
   (:documentation "Commit a composite revision whose content is
-(MAKE-MANIFEST PARTS) → REVISION. PARENTS, REF, EXPECTED, MESSAGE as in
-COMMIT-REVISION. A composite revision has no state to diff: REVISION-STATE
+(MAKE-MANIFEST PARTS) → REVISION. PARENTS, REF, EXPECTED, MESSAGE, PROVENANCE,
+VALID-AT and ID as in COMMIT-REVISION (same defaults, conditions and restarts; a
+backend that cannot honor a caller ID refuses it with REVISION-ERROR). A composite revision has no state to diff: REVISION-STATE
 returns the manifest."))
 
 (defgeneric composite-manifest (store designator)

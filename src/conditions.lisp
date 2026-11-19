@@ -8,6 +8,7 @@
 ;;;     ref-conflict      restarts: use-current, retry
 ;;;     tag-immutable     restart:  create-new-tag (new-name)
 ;;;     cycle-refused
+;;;     vc-tool-version-error (0.3.0; signalled by the git / jj backends)
 ;;;
 ;;; Restarts are established by the store operation that can recover
 ;;; (MOVE-REF, COMMIT-REVISION, DELETE-REF, TAG-REVISION), not by the
@@ -76,6 +77,24 @@ TARGET is the id the tag points at. Restart: CREATE-NEW-TAG (where offered)."))
                      (revision-error-message c))))
   (:documentation "A commit would make the graph cyclic (caller-supplied
 ID that is an ancestor-or-self of one of PARENTS)."))
+
+(define-condition vc-tool-version-error (revision-error)
+  ((tool :initarg :tool :reader vc-tool-version-error-tool :initform nil)
+   (found :initarg :found :reader vc-tool-version-error-found :initform nil)
+   (required :initarg :required :reader vc-tool-version-error-required
+             :initform nil))
+  (:report (lambda (c s)
+             (format s "~a ~a is too old or missing: found ~a, need ~a or later"
+                     (or (vc-tool-version-error-tool c) "tool")
+                     (if (vc-tool-version-error-found c) "version" "program")
+                     (or (vc-tool-version-error-found c) "nothing")
+                     (vc-tool-version-error-required c))))
+  (:documentation "The version-control program TOOL (a string: \"git\", \"jj\")
+that a backend store drives is older than REQUIRED (a version string), or cannot be
+run at all. FOUND is the version string the program reported, or NIL when it could
+not be started. Signalled by a backend's store constructor (MAKE-GIT-STORE,
+MAKE-JJ-STORE) before any other command of that program runs; the backends
+re-export this symbol."))
 
 ;;; ------------------------------------------------------------------
 ;;; Condition tree (R0b) — all under REVISION-ERROR:

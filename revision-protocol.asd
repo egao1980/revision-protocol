@@ -1,5 +1,5 @@
 (defsystem "revision-protocol"
-  :version "0.2.0"
+  :version "0.3.0"
   :description "CLOS revision protocol for cl-stack: immutable revision DAG, movable refs and immutable tags with CAS updates, revision designators (as-of on recorded/valid time), graph walks; content (states and deltas on diff-protocol), targets and transition plans, projections, composite revisions"
   :author "egao1980"
   :license "MIT"
@@ -39,7 +39,9 @@
                (:file "projection-test")
                (:file "composite-test")
                (:file "force-test")
-               (:file "law-r0b-test"))
+               (:file "law-r0b-test")
+               ;; 0.3.0
+               (:file "v03-test"))
   :perform (test-op (o c)
              (unless (symbol-call :rove :run c)
                (error "tests failed for ~A" (component-name c)))))
