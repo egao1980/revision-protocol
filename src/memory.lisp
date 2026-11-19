@@ -42,16 +42,34 @@
    (refs :initform (make-hash-table :test 'equal) :reader %refs
          :documentation "name → immutable REVISION-REF snapshot.")
    (random-state :initform (make-random-state t) :reader %random-state
-                 :documentation "Used only under LOCK, for default ids."))
+                 :documentation "Used only under LOCK, for default ids.")
+   ;; R0b
+   (primary :initarg :primary :initform :state :reader %primary
+            :documentation ":STATE or :DELTA (CONTENT-PRIMARY).")
+   (engine :initarg :engine :reader %engine
+           :documentation "DIFF-PROTOCOL engine for states (CONTENT-ENGINE).")
+   (permit-force :initarg :permit-force :initform nil :reader %permit-force
+                 :documentation "NIL, T, or a predicate of the ref name
+(PERMIT-FORCE-P)."))
   (:documentation "Reference REVISION-STORE kept in Lisp memory."))
 
 (defun in-memory-store-p (x)
   "T when X is a IN-MEMORY-STORE."
   (typep x 'in-memory-store))
 
-(defun make-in-memory-store ()
-  "A fresh, empty IN-MEMORY-STORE."
-  (make-instance 'in-memory-store))
+(defun make-in-memory-store (&key (primary :state)
+                               (engine (make-instance 'diff:sexp-diff-engine))
+                               permit-force)
+  "A fresh, empty IN-MEMORY-STORE.
+R0b keys: PRIMARY (:STATE or :DELTA, what each revision keeps), ENGINE (the
+DIFF-PROTOCOL engine for its states, default a SEXP-DIFF-ENGINE), PERMIT-FORCE
+(NIL, T, or a function of a ref name: when true the FORCE restart is offered on
+REF-CONFLICT)."
+  (check-type primary (member :state :delta))
+  (check-type engine diff:diff-engine)
+  (check-type permit-force (or boolean function))
+  (make-instance 'in-memory-store
+                 :primary primary :engine engine :permit-force permit-force))
 
 ;;; ------------------------------------------------------------------
 ;;; Locking core
@@ -325,8 +343,10 @@ smallest id."
             collect (%by-id store id))))
 
 (defmethod walk-revisions ((store in-memory-store) from
-                           &key (order :topo) until reverse)
+                           &key (order :topo) until reverse footprint)
   (check-type order (member :topo :time :first-parent))
+  (when footprint
+    (%r0b-stub 'walk-revisions :footprint))
   (%check-designators from)
   (%check-designators until)
   (let ((walk (%with-store (store) (%walk-locked store from order until))))

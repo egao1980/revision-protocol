@@ -76,3 +76,105 @@ TARGET is the id the tag points at. Restart: CREATE-NEW-TAG (where offered)."))
                      (revision-error-message c))))
   (:documentation "A commit would make the graph cyclic (caller-supplied
 ID that is an ancestor-or-self of one of PARENTS)."))
+
+;;; ------------------------------------------------------------------
+;;; Condition tree (R0b) — all under REVISION-ERROR:
+;;;
+;;;   merge-conflict              restarts: take-ours, take-theirs, use-merged, abort
+;;;   irreversible-step           restarts: skip-step, stamp-only, abort-transition
+;;;   target-drift-detected       restarts: capture-and-continue, discard-drift, abort
+;;;   step-failed                 restarts: retry-step, skip-step, rollback-to-start
+;;;   projection-unsupported      restarts: use-shadow, accept-model-fidelity,
+;;;                                         apply-for-real (only those applicable)
+;;;   projection-stale
+;;;   composite-part-unavailable  restarts: skip-part, rebuild-from-recipe
+;;;
+;;; plus restart FORCE on REF-CONFLICT, offered only when PERMIT-FORCE-P.
+;;; ABORT is CL:ABORT. As in R0a, the operation that can recover establishes
+;;; the restarts (COMMIT-PROJECTION, EXECUTE-PLAN, PROJECT-PLAN,
+;;; RESTORE-COMPOSITE, MOVE-REF / COMMIT-REVISION / DELETE-REF).
+;;; ------------------------------------------------------------------
+
+(define-condition merge-conflict (revision-error)
+  ((conflicts :initarg :conflicts :reader merge-conflict-conflicts :initform nil)
+   (projection :initarg :projection :reader merge-conflict-projection
+               :initform nil))
+  (:report (lambda (c s)
+             (format s "merge has ~d conflict~:p~@[: ~a~]"
+                     (length (merge-conflict-conflicts c))
+                     (revision-error-message c))))
+  (:documentation "COMMIT-PROJECTION of a merge projection that still has
+conflicts. CONFLICTS is the list of DIFF-PROTOCOL:DIFF-CONFLICT values,
+PROJECTION the projection. Restarts: TAKE-OURS, TAKE-THEIRS, USE-MERGED, ABORT."))
+
+(define-condition irreversible-step (revision-error)
+  ((step :initarg :step :reader irreversible-step-step :initform nil))
+  (:report (lambda (c s)
+             (format s "plan step ~s cannot be undone~@[: ~a~]"
+                     (irreversible-step-step c)
+                     (revision-error-message c))))
+  (:documentation "EXECUTE-PLAN reached a :DOWN step whose revision delta has no
+inverse. STEP is the PLAN-STEP. Restarts: SKIP-STEP, STAMP-ONLY,
+ABORT-TRANSITION."))
+
+(define-condition target-drift-detected (revision-error)
+  ((target :initarg :target :reader target-drift-detected-target :initform nil)
+   (drift :initarg :drift :reader target-drift-detected-drift :initform nil))
+  (:report (lambda (c s)
+             (format s "target ~s drifted from its stamped revision~@[: ~a~]"
+                     (target-drift-detected-target c)
+                     (revision-error-message c))))
+  (:documentation "EXECUTE-PLAN found the target's state differs from the state
+of its stamped revision. DRIFT is the diff (stamped state → actual state).
+Restarts: CAPTURE-AND-CONTINUE, DISCARD-DRIFT, ABORT."))
+
+(define-condition step-failed (revision-error)
+  ((step :initarg :step :reader step-failed-step :initform nil)
+   (cause :initarg :cause :reader step-failed-cause :initform nil)
+   (attempt :initarg :attempt :reader step-failed-attempt :initform 1))
+  (:report (lambda (c s)
+             (format s "plan step ~s failed (attempt ~d)~@[: ~a~]"
+                     (step-failed-step c)
+                     (step-failed-attempt c)
+                     (or (step-failed-cause c) (revision-error-message c)))))
+  (:documentation "Applying a plan step signalled an error. CAUSE is that
+condition, ATTEMPT counts from 1. Restarts: RETRY-STEP, SKIP-STEP,
+ROLLBACK-TO-START."))
+
+(define-condition projection-unsupported (revision-error)
+  ((fidelity :initarg :fidelity :reader projection-unsupported-fidelity
+             :initform nil)
+   (supported :initarg :supported :reader projection-unsupported-supported
+              :initform nil))
+  (:report (lambda (c s)
+             (format s "projection fidelity ~s unsupported (supported: ~s)~@[: ~a~]"
+                     (projection-unsupported-fidelity c)
+                     (projection-unsupported-supported c)
+                     (revision-error-message c))))
+  (:documentation "The requested projection FIDELITY is not among SUPPORTED.
+Restarts (each only when applicable): USE-SHADOW, ACCEPT-MODEL-FIDELITY,
+APPLY-FOR-REAL."))
+
+(define-condition projection-stale (revision-error)
+  ((projection :initarg :projection :reader projection-stale-projection
+               :initform nil))
+  (:report (lambda (c s)
+             (format s "projection ~s is stale: its target changed~@[: ~a~]"
+                     (projection-stale-projection c)
+                     (revision-error-message c))))
+  (:documentation "A projection of a target was read or committed after the
+target's revisions or state changed."))
+
+(define-condition composite-part-unavailable (revision-error)
+  ((part :initarg :part :reader composite-part-unavailable-part :initform nil)
+   (reason :initarg :reason :reader composite-part-unavailable-reason
+           :initform nil))
+  (:report (lambda (c s)
+             (format s "composite part ~s cannot be restored (~s)~@[: ~a~]"
+                     (composite-part-unavailable-part c)
+                     (composite-part-unavailable-reason c)
+                     (revision-error-message c))))
+  (:documentation "RESTORE-COMPOSITE cannot bring PART back. REASON is
+:NO-STORE (the part's store is not available), :NO-TARGET (no target given for
+its role) or :NOT-FOUND (its store no longer has the revision). Restarts:
+SKIP-PART, REBUILD-FROM-RECIPE (only when the part has a recipe)."))

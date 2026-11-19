@@ -6,6 +6,8 @@ Capability brief: [`cl-stack/docs/capabilities/revision.md`](https://github.com/
 
 Version **0.1.0** — milestone R0a, the graph layer, with a thread-safe `in-memory-store` (one lock; conditions are signalled only after it is released, so handlers may call back into the store). Content, targets, plans, projections and the diff integration are R0b.
 
+**R0b (contract on this branch, in progress):** the content layer on [`diff-protocol`](https://github.com/egao1980/diff-protocol) (`revision-state`, `revision-delta`, `delta-inverse`, `delta-footprint`, `state-diff`, `content-primary` `:state`|`:delta`, `walk-revisions :footprint`), targets and plans (`target-revisions`, `target-stamp`, `target-drift`, `capture-revision`, `plan-transition`, `describe-plan`, `execute-plan`, `with-target-transaction`), projections (`project-state`, `project-plan`, `project-merge`, `commit-projection`, `discard-projection`), composite revisions (`commit-composite`, `plan-composite`, `restore-composite`), an `in-memory-target` over sexp states, the rest of the condition tree and the permission-gated `force` restart. The methods are stubs; `tests/` (content, target, plan, projection, composite, force and law-r0b) is the spec.
+
 ## R0a surface
 
 - **Revisions** are immutable: `revision-id`, `revision-parent-ids` (first parent first; merges allowed), `revision-recorded-at` (store clock, a `datetime-protocol` instant), `revision-valid-at` (optional, caller-supplied), `revision-provenance`, `revision-message`, `revision-content` (opaque until R0b).
