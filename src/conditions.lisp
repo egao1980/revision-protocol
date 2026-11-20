@@ -6,7 +6,9 @@
 ;;;     revision-not-found
 ;;;     ambiguous-revision
 ;;;     ref-conflict      restarts: use-current, retry
-;;;     tag-immutable     restart:  create-new-tag (new-name)
+;;;     tag-immutable     restarts: create-new-tag (new-name),
+;;;                                 replace-annotation (0.4.0; TAG-REVISION
+;;;                                 only, when TAG-REWRITE-P)
 ;;;     cycle-refused
 ;;;     vc-tool-version-error (0.3.0; signalled by the git / jj backends)
 ;;;
@@ -65,7 +67,9 @@ are revision ids, or NIL for an absent ref. Restarts: USE-CURRENT, RETRY."))
                      (tag-immutable-target c)
                      (revision-error-message c))))
   (:documentation "An operation would move, retarget or delete tag NAME.
-TARGET is the id the tag points at. Restart: CREATE-NEW-TAG (where offered)."))
+TARGET is the id the tag points at. Restarts: CREATE-NEW-TAG (where offered);
+REPLACE-ANNOTATION from TAG-REVISION when only the annotation differs and the
+store answers TAG-REWRITE-P true."))
 
 (define-condition cycle-refused (revision-error)
   ((id :initarg :id :reader cycle-refused-id :initform nil)

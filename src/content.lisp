@@ -87,6 +87,15 @@ conflict reads. Default method (and the in-memory store): NIL."))
 (defmethod conflicted-revisions-p ((store revision-store))
   nil)
 
+(defgeneric tag-rewrite-p (store)
+  (:documentation "True when STORE can rewrite an existing tag's annotation in
+place, keeping its target (capability :tag-rewrite; git `tag -f`). Gates the
+REPLACE-ANNOTATION restart of TAG-REVISION: tags stay immutable by default, the
+restart is an explicit opt-in per call. Default method: NIL. In-memory store: T."))
+
+(defmethod tag-rewrite-p ((store revision-store))
+  nil)
+
 ;;; ------------------------------------------------------------------
 ;;; Content protocol
 ;;; ------------------------------------------------------------------

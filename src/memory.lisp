@@ -105,8 +105,9 @@ called %FAIL."
            (error ,result)))))
 
 (defun %notify (store event)
-  "Call STORE's listener with EVENT (when both are non-NIL). Lock not held."
-  (let ((fn (%listener store)))
+  "Call STORE's listener with EVENT (when both are non-NIL). Lock not held:
+the listener is read under the lock and called after release."
+  (let ((fn (and event (bt2:with-lock-held ((%lock store)) (%listener store)))))
     (when (and fn event)
       (funcall fn event))))
 
@@ -444,6 +445,10 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
   (mapc #'%check-designator parents)
   (when expected
     (%check-designator expected))
+  (when (and expected-p (null ref))
+    (error 'revision-error
+           :message (format nil "commit-revision :expected ~s given without :ref"
+                            expected)))
   (let* ((ref (and ref (copy-seq ref)))
          (id (and id (copy-seq id)))
          (provenance (copy-list provenance))
@@ -553,8 +558,9 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
                (return (tag-revision store new-name designator)))))
           (t (error result)))))))
 
-(defun %tag-locked (store name designator annotation)
-  "→ (values revision-ref event)."
+(defun %tag-locked (store name designator annotation &optional replace)
+  "→ (values revision-ref event). REPLACE true: an existing tag with the same
+target gets ANNOTATION in place (no event)."
   (let ((entry (gethash name (%refs store)))
         (target (%resolve-id store designator)))
     (cond
@@ -570,6 +576,12 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
       ((and (equal target (ref-target entry))
             (equal annotation (ref-annotation entry)))
        (values entry nil))
+      ((and replace (equal target (ref-target entry)))
+       (let ((new (make-instance 'revision-ref :name name :kind :tag
+                                               :target target
+                                               :annotation annotation)))
+         (setf (gethash name (%refs store)) new)
+         (values new nil)))
       (t
        (%fail 'tag-immutable :name name :target (ref-target entry))))))
 
@@ -586,11 +598,24 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
            (%notify store event)
            ref))
         ((typep result 'tag-immutable)
-         (restart-case (error result)
-           (create-new-tag (new-name)
-             :report "Create a new tag with another name instead."
-             :interactive %read-new-tag-name
-             (tag-revision store new-name designator :annotation annotation))))
+         ;; REPLACE-ANNOTATION only when the target is the same (tags never
+         ;; move) and the store can rewrite tags.
+         (let ((rewritable (and (tag-rewrite-p store)
+                                (equal (tag-immutable-target result)
+                                       (revision-id
+                                        (resolve-revision store designator))))))
+           (restart-case (error result)
+             (create-new-tag (new-name)
+               :report "Create a new tag with another name instead."
+               :interactive %read-new-tag-name
+               (tag-revision store new-name designator :annotation annotation))
+             (replace-annotation ()
+               :test (lambda (c) (declare (ignore c)) rewritable)
+               :report (lambda (s)
+                         (format s "Rewrite the annotation of tag ~s (target unchanged)."
+                                 name))
+               (%with-store (store)
+                 (values (%tag-locked store name designator annotation t)))))))
         (t (error result))))))
 
 (defun %delete-locked (store name expected expected-p)
@@ -662,7 +687,11 @@ runs before the first mutation, so a %FAIL leaves the store unchanged."
 ;;; ------------------------------------------------------------------
 
 (defmethod ref-listener ((store in-memory-store))
-  (%listener store))
+  (bt2:with-lock-held ((%lock store))
+    (%listener store)))
+
+(defmethod tag-rewrite-p ((store in-memory-store))
+  t)
 
 (defmethod (setf ref-listener) (function (store in-memory-store))
   (check-type function (or null function))
