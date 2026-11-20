@@ -30,6 +30,7 @@
    #:use-current
    #:retry
    #:create-new-tag
+   #:replace-annotation
 
    ;; revisions (immutable values)
    #:revision
@@ -145,6 +146,7 @@
    #:target-transactional-p
    #:ref-cas-p
    #:conflicted-revisions-p
+   #:tag-rewrite-p
 
    ;; content layer
    #:revision-payload

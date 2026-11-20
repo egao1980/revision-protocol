@@ -4,7 +4,9 @@ CLOS revision protocol for [cl-stack](https://github.com/egao1980/cl-stack) (`st
 
 Capability brief: [`cl-stack/docs/capabilities/revision.md`](https://github.com/egao1980/cl-stack/blob/main/docs/capabilities/revision.md).
 
-Version **0.3.0** — milestones R0a (graph layer, thread-safe `in-memory-store`; one lock, conditions are signalled only after it is released) and R0b: content (states / deltas over diff-protocol), targets and plans with resumable `execute-plan`, projections (`:exact` / `:shadow` / `:model`), merges, and composite revisions, with an `in-memory-target`.
+Version **0.4.0** — milestones R0a (graph layer, thread-safe `in-memory-store`; one lock, conditions are signalled only after it is released) and R0b: content (states / deltas over diff-protocol), targets and plans with resumable `execute-plan`, projections (`:exact` / `:shadow` / `:model`), merges, and composite revisions, with an `in-memory-target`.
+
+**0.4.0:** `commit-revision :expected` given without `:ref` (even `nil`) signals `revision-error` instead of being ignored. `tag-revision` on an existing tag with the same target but another annotation still signals `tag-immutable`; a store whose new capability query `tag-rewrite-p` (`:tag-rewrite`, default NIL, in-memory T) is true also offers restart `replace-annotation`, which rewrites the annotation in place (target unchanged, no listener event). `ref-listener` reads under the store lock (#2).
 
 **0.3.0:** `commit-composite`, `commit-projection` and `capture-revision` take `:id`, `:valid-at` and `:provenance` like `commit-revision` (a backend that chooses its own ids, such as git or jj, refuses `:id` with `revision-error`); `execute-plan`'s `capture-and-continue` restart takes `&key id message` (message default `"captured drift"`) (#6). `vc-tool-version-error` (tool / found / required) lives here, shared by the git and jj backends (#4). Capability queries `ref-cas-p` (`:ref-cas`, default T) and `conflicted-revisions-p` (`:conflicted-revisions`, default NIL) (#5). Backends with a `capture-revision` method must accept the new keys (revision-backend-git / -jj 0.2.0).
 
@@ -16,7 +18,7 @@ Version **0.3.0** — milestones R0a (graph layer, thread-safe `in-memory-store`
 - **Refs** are movable (`:movable`) or immutable tags (`:tag`), one namespace. Every update is compare-and-swap through `:expected`.
 - **Designators** are values: a string id or id prefix (≥ 4 chars), a `revision`, `(rev-ref name)`, `(rev-tag name)`, `(rev-as-of instant :on ref :axis :recorded|:valid)`, `(rev-parent d n)`, `(rev-ancestor d n)`.
 - **Store GFs:** `resolve-revision`, `commit-revision`, `move-ref`, `tag-revision`, `delete-ref`, `find-ref`, `list-refs`, `revision-parents`, `revision-children`, `walk-revisions` (`:topo` `:time` `:first-parent`, `:until`, `:reverse`), `merge-base` (`:all`), `ancestor-p`, `revision-range`, `heads`, `ref-listener`.
-- **Conditions:** `revision-error` → `revision-not-found`, `ambiguous-revision`, `ref-conflict` (restarts `use-current`, `retry`), `tag-immutable` (restart `create-new-tag`), `cycle-refused`.
+- **Conditions:** `revision-error` → `revision-not-found`, `ambiguous-revision`, `ref-conflict` (restarts `use-current`, `retry`), `tag-immutable` (restarts `create-new-tag`, `replace-annotation` where `tag-rewrite-p`), `cycle-refused`.
 
 ```lisp
 (let ((s (stack-rev:make-in-memory-store)))

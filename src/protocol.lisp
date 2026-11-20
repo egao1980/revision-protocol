@@ -188,7 +188,8 @@ PARENTS: list of designators, first parent first. When omitted and REF names an
 existing ref, the parent is REF's current target; otherwise a root.
 REF: name of a movable ref moved to the new revision (created if absent).
 EXPECTED: CAS value for REF (an id/designator, or NIL = ref must be absent);
-when omitted it is the target REF had when the commit started.
+when omitted it is the target REF had when the commit started. EXPECTED given
+(even NIL) without REF signals REVISION-ERROR before anything is written (0.4.0).
 VALID-AT: optional instant. PROVENANCE: plist. ID: caller-chosen id (a string).
 A backend that chooses ids itself (git, jj) refuses a non-NIL ID with
 REVISION-ERROR before anything is written; the in-memory store accepts it.
@@ -210,7 +211,11 @@ absent; RETRY → move with EXPECTED = current) and TAG-IMMUTABLE when NAME is a
 (defgeneric tag-revision (store name designator &key annotation)
   (:documentation "Create immutable tag NAME at DESIGNATOR → REVISION-REF.
 Same target and annotation as an existing tag: returns it (idempotent).
-Existing tag otherwise: TAG-IMMUTABLE (restart CREATE-NEW-TAG new-name).
+Existing tag otherwise: TAG-IMMUTABLE (restart CREATE-NEW-TAG new-name). When the
+target is the same and only ANNOTATION differs, a store whose TAG-REWRITE-P is
+true also offers restart REPLACE-ANNOTATION: rewrite the tag's annotation in
+place (target unchanged, no listener event) and return the new REVISION-REF.
+Without TAG-REWRITE-P, (FIND-RESTART 'REPLACE-ANNOTATION) is NIL.
 Existing movable ref NAME: REF-CONFLICT (expected NIL, actual its target)."))
 
 (defgeneric delete-ref (store name &key expected)
@@ -263,7 +268,9 @@ when unrelated. ALL T → list of every best common ancestor."))
 (defgeneric ref-listener (store)
   (:documentation "Function called after each ref change with one event list
 (:REF-MOVED name old-id new-id): OLD-ID NIL on creation (including tags),
-NEW-ID NIL on deletion. Not called for failed or abandoned updates. NIL = none."))
+NEW-ID NIL on deletion. Not called for failed or abandoned updates, nor for a
+tag annotation rewrite (REPLACE-ANNOTATION; the target does not move).
+NIL = none."))
 
 (defgeneric (setf ref-listener) (function store)
   (:documentation "Install FUNCTION (or NIL) as STORE's ref listener."))
